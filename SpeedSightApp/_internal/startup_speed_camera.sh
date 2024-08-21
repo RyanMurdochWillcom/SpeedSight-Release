@@ -1,3 +1,3 @@
 #!/bin/sh
-cd /Apps/SpeedSightApp
+cd /Apps/SpeedSight-Release/SpeedSightApp
 ./SpeedSightApp
