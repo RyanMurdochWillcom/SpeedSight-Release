@@ -162,3 +162,4 @@ cython_debug/
 #.idea/
 /SpeedSightApp/_internal/local_config.json
 /SpeedSightApp/sunrise_sunset.json
+/SpeedSightTest/_internal/image*
