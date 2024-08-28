@@ -1,1 +1,1 @@
-{"debug": true, "mongoConnectionStr": "mongodb://willcom:W1llc0m03!@localhost:27017", "mongoDevConnectionStr": "mongodb://willcom:W1llc0m03!@localhost:27021"}
+{"debug": false, "mongoConnectionStr": "mongodb://willcom:W1llc0m03!@localhost:27017", "mongoDevConnectionStr": "mongodb://willcom:W1llc0m03!@localhost:27021"}
