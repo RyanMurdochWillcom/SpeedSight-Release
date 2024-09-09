@@ -2,3 +2,5 @@
 /SpeedSightApp/sunrise_sunset.json
 /SpeedSightTest/_internal/image*
 /SpeedSightModem/_internal/modemmodel.json
+/SpeedSightModem/_internal/connectionLog.log
+/SpeedSightModem/_internal/libpython3.11.so
