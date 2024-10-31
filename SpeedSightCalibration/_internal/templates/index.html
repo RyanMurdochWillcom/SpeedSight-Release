@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SpeedSight Radar Calibration</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        .container {
+            text-align: center;
+        }
+        .hidden {
+            display: none;
+        }
+        .calibration-log {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        input[type="text"], input[type="password"] {
+            width: auto;
+            box-sizing: content-box;
+            padding: 5px;
+            font-size: 16px;
+        }
+        input[type="file"] {
+            width: auto;
+            box-sizing: content-box;
+            padding: 5px;
+            font-size: 16px;
+            display: block;
+            margin: 10px auto;
+        }
+        #approval-status {
+            color: red;
+        }
+        .file-input-wrapper {
+            display: flex;
+            justify-content: center;
+        }
+        #approval-loading {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SpeedSight Radar Calibration</h1>
+        <div id="step1">
+            <h2>Step 1</h2>
+            <button id="connect-db-btn">Initialise SpeedSight</button>
+            <p id="db-status"></p>
+        </div>
+        <div id="step2" class="hidden">
+            <h2>Step 2</h2>
+            <button id="start-calibration-btn">Start Calibration</button>
+            <button id="end-calibration-btn">End Calibration</button>
+            <div id="calibration-status"></div>
+            <div id="calibration-log" class="calibration-log"></div>
+        </div>
+        <div id="step3" class="hidden">
+            <h2>Step 3</h2>
+            <div id="variables">
+                <p>Calibration Start Date: <span id="calibration_start_date"></span></p>
+                <p>Calibration End Date: <span id="calibration_end_date"></span></p>
+                <p>Radar Module Serial Number: <span id="radar_serial"></span></p>
+            </div>
+            <input type="text" id="certificate-number" name="certificateNumber" placeholder="Certificate Number" required>
+            <h4>Upload Certificate</h4>
+            <div class="file-input-wrapper">
+                <input type="file" id="file-upload" name="file" required>
+            </div>
+            <br>
+            <input type="password" id="password" placeholder="Approval Password">
+            <button id="approve-calibration-btn">Approve Calibration</button>
+            <p id="approval-loading-status">
+                <span id="approval-loading">
+                    <img src="/Apps/SpeedSight-Release/SpeedSightCalibration/_internal/static/loading.gif" alt="Uploading..." width="40px">
+                </span>
+            </p>
+            <p id="approval-status"></p>
+            <button id="restart-calibration-btn">Restart Calibration</button>
+        </div>
+    </div>
+
+    <script>
+        let calibrationSource;
+
+        $(document).ready(function(){
+            $('#connect-db-btn').click(function(){
+                $.post('/connect_database', function(response){
+                    $('#db-status').text(response.message);
+                    if(response.success){
+                        $('#step1').hide();
+                        $('#step2').removeClass('hidden');
+                    }
+                });
+            });
+
+            $('#start-calibration-btn').click(function(){
+                $.post('/start_calibration', function(response){
+                    if(response.success){
+                        $('#calibration-status').html('<p>' + response.message + '</p>');
+                        $('#calibration-log').html('');
+                        if (!calibrationSource){
+                            calibrationSource = new EventSource('/calibration_stream');
+                        }
+                        console.log(calibrationSource);
+                        calibrationSource.onmessage = function(event){
+                            let log = $('#calibration-log');
+                            log.append('<p>' + event.data + '</p>');
+                            log.scrollTop(log.prop("scrollHeight"));
+                        };
+                        // Change the button text to "Next Calibration"
+                        $('#start-calibration-btn').text('Next Calibration');
+                    }
+                });
+            });
+
+            $('#end-calibration-btn').click(function(){
+                $.post('/end_calibration', function(response){
+                    if(response.success){
+                        $('#calibration-status').html('<p>' + response.message + '</p>');
+                        if (calibrationSource) {
+                            calibrationSource.close();
+                        }
+                        $('#step2').hide();
+                        $.get('/get_variables', function(data){
+                            $('#calibration_start_date').text(data.calibration_start_date);
+                            $('#calibration_end_date').text(data.calibration_end_date);
+                            $('#radar_serial').text(data.radar_serial);
+                        });
+                        $('#step3').removeClass('hidden');
+                    }
+                });
+            });
+
+            $('#approve-calibration-btn').click(function(){
+                $('#approval-status').hide();
+                let password = $('#password').val();
+                let certificateNumber = $('#certificate-number').val();
+                let fileInput = $('#file-upload')[0].files[0];
+                if (certificateNumber === "") { 
+                    $('#approval-status').text("Calibration certificate number is required");
+                    $('#approval-status').show();
+                    return;
+                }
+                if (!fileInput) {
+                    $('#approval-status').text("Please upload the calibration certificate");
+                    $('#approval-status').show();
+                    return;
+                }
+
+                // Show loading icon
+                $('#approval-loading').show(); // Show loading icon
+                
+                let formData = new FormData();
+                formData.append('password', password);
+                formData.append('certificateNumber', certificateNumber);
+                formData.append('file', fileInput);
+                
+                $.ajax({
+                    url: '/approve_calibration',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response){
+                        $('#approval-status').show();
+                        $('#approval-status').text(response.message);
+                        if(response.message.includes("Calibration successfully")){
+                            $('#approval-status').css('color', 'green');
+                        } else {
+                            $('#approval-status').css('color', 'red');
+                        }
+                    },
+                    error: function(xhr, status, error){
+                        $('#approval-status').show();
+                        console.error("Error:", error);
+                        $('#approval-status').text("An error occurred while processing the request");
+                        $('#approval-status').css('color', 'red');
+                    },
+                    complete: function(){
+                        $('#approval-loading').hide(); // Hide loading icon
+                    }
+                });
+            });
+
+            $('#restart-calibration-btn').click(function(){
+                location.reload();
+            });
+
+            $('#certificate-number').on('input', function() {
+                $(this).attr('size', $(this).val().length);
+            }).trigger('input'); // trigger input event to set initial size
+        });
+    </script>
+</body>
+</html>
